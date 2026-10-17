@@ -1,0 +1,30 @@
+{
+  "port": 3000,
+  "host": "127.0.0.1",
+
+  "cardSize": 5,
+  "freeCenter": true,
+
+  "thresholds": {
+    "minBits": 1,
+    "bigBits": 1000,
+    "minDono": 1,
+    "bigDono": 10,
+    "bigSubgift": 5,
+    "minRaidViewers": 1
+  },
+
+  "events": {
+    "follow": "leicht",
+    "bits": "leicht",
+    "bigBits": "schwer",
+    "dono": "mittel",
+    "bigDono": "schwer",
+    "sub": "mittel",
+    "subgift": "mittel",
+    "bigSubgift": "schwer",
+    "raid": "raid"
+  },
+
+  "followOncePerUser": true
+}

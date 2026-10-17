@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Bingo Overlay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Inter:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: rgba(18, 20, 28, 0.82);
+    --cell: rgba(40, 44, 58, 0.88);
+    --cell-empty: rgba(40, 44, 58, 0.45);
+    --border: rgba(255, 255, 255, 0.12);
+    --text: #f4f6fb;
+    --muted: #aab3c5;
+    --done: #3ecf5e;
+    --accent: #ffcf3f;
+    --pixel: 'Pixelify Sans', 'Inter', system-ui, sans-serif;
+    --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: transparent; color: var(--text); font-family: var(--sans); overflow: hidden; height: 100%; }
+  .hidden { display: none !important; }
+
+  /* ---------- Karte ---------- */
+  #grid-view { height: 100vh; width: 100vw; padding: 1.2vmin; display: flex; flex-direction: column; }
+  .panel { background: var(--bg); border: 2px solid var(--border); border-radius: 1.6vmin; padding: 1.6vmin; display: flex; flex-direction: column; gap: 1.2vmin; flex: 1; min-height: 0; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 2vmin; }
+  .title { font-family: var(--pixel); font-weight: 700; font-size: 4.6vmin; letter-spacing: .05em; color: var(--accent); text-shadow: 0 .4vmin 0 #8a5a00; white-space: nowrap; }
+  .stats { font-family: var(--pixel); font-size: 2.6vmin; color: var(--muted); white-space: nowrap; }
+  .stats b { color: var(--text); }
+  .grid { flex: 1; min-height: 0; display: grid; gap: .9vmin; }
+  .cell { position: relative; background: var(--cell); border-radius: 1vmin; padding: .9vmin 1vmin .9vmin 1.5vmin; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border: 2px solid transparent; }
+  .cell::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: .7vmin; background: var(--tier, transparent); }
+  .cell .txt { font-weight: 800; font-size: var(--fs, 2.2vmin); line-height: 1.15; overflow-wrap: normal; }
+  .cell .who { font-size: calc(var(--fs, 2.2vmin) * .72); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .4vmin; }
+  .cell.empty { background: var(--cell-empty); align-items: center; justify-content: center; }
+  .cell.empty::after { content: '?'; font-family: var(--pixel); font-size: 4vmin; color: rgba(255,255,255,.14); }
+  .cell.free { background: linear-gradient(135deg, #3a2f0b, #5c4708); align-items: center; justify-content: center; border-color: rgba(255,207,63,.5); }
+  .cell.free span { font-family: var(--pixel); font-weight: 700; font-size: 3.4vmin; color: var(--accent); }
+  .cell.done { background: rgba(30, 80, 42, 0.9); border-color: rgba(62, 207, 94, .7); }
+  .cell.done .txt { color: #c9f5d3; text-decoration: line-through; text-decoration-thickness: .3vmin; opacity: .8; }
+  .cell.done::after { content: '✔'; position: absolute; right: .6vmin; bottom: .1vmin; font-size: 5vmin; color: var(--done); opacity: .9; text-shadow: 0 0 1vmin rgba(0,0,0,.5); }
+  .cell.win { box-shadow: inset 0 0 0 .4vmin var(--accent); }
+  .cell.new { animation: pop .9s cubic-bezier(.2,1.6,.4,1), glow 2.5s ease-out; }
+  .queue { font-size: 2.2vmin; color: var(--muted); font-weight: 600; }
+  .queue b { color: var(--accent); }
+
+  @keyframes pop { 0% { transform: scale(.2) rotate(-8deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+  @keyframes glow { 0%, 40% { border-color: var(--accent); box-shadow: 0 0 3vmin var(--accent); } 100% { border-color: transparent; box-shadow: none; } }
+
+  /* ---------- Liste ---------- */
+  #list-view { padding: 12px; width: 100vw; }
+  .list { background: var(--bg); border: 2px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  .list .title { font-size: 30px; text-shadow: 0 3px 0 #8a5a00; margin-bottom: 4px; }
+  .list .stats { font-size: 18px; margin-bottom: 10px; }
+  .item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; margin-top: 6px; background: var(--cell); border-radius: 8px; border-left: 6px solid var(--tier); }
+  .item .box { flex: none; width: 22px; height: 22px; margin-top: 2px; border: 3px solid var(--muted); border-radius: 5px; display: grid; place-items: center; font-size: 16px; color: var(--done); }
+  .item .txt { font-weight: 800; font-size: 21px; line-height: 1.2; }
+  .item .who { font-size: 15px; color: var(--muted); margin-top: 2px; }
+  .item.done { opacity: .6; }
+  .item.done .txt { text-decoration: line-through; }
+  .item.done .box { border-color: var(--done); }
+  .item.new { animation: slide .7s cubic-bezier(.2,1.4,.4,1), glowl 2.5s ease-out; }
+  .list .empty-msg { color: var(--muted); font-size: 18px; padding: 6px 2px; }
+  .list .more { color: var(--muted); font-size: 16px; margin-top: 8px; }
+  @keyframes slide { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes glowl { 0%, 40% { box-shadow: 0 0 18px var(--accent); } 100% { box-shadow: none; } }
+
+  /* ---------- Einblendungen ---------- */
+  #toast { position: fixed; left: 50%; top: 4vh; transform: translate(-50%, -150%); opacity: 0; transition: transform .5s cubic-bezier(.2,1.4,.4,1), opacity .3s; z-index: 10;
+    background: #1c1f2b; border: 3px solid var(--accent); border-radius: 14px; padding: 12px 22px; min-width: min(560px, 90vw); max-width: 94vw; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  #toast.show { transform: translate(-50%, 0); opacity: 1; }
+  #toast .t1 { font-family: var(--pixel); font-size: clamp(16px, 3vmin, 30px); color: var(--accent); }
+  #toast .t2 { font-weight: 800; font-size: clamp(20px, 4vmin, 40px); margin-top: 4px; }
+  #toast .t3 { display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 99px; font-size: clamp(12px, 2vmin, 18px); font-weight: 800; color: #111; }
+
+  #bingo { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 20; }
+  #bingo span { font-family: var(--pixel); font-weight: 700; font-size: 22vmin; color: var(--accent); text-shadow: 0 1.5vmin 0 #8a5a00, 0 0 6vmin rgba(255,207,63,.8); animation: bingo 3.2s ease-out forwards; }
+  @keyframes bingo { 0% { transform: scale(.1) rotate(-20deg); opacity: 0; } 15% { transform: scale(1.15) rotate(4deg); opacity: 1; } 25%, 80% { transform: scale(1) rotate(0); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+
+  #offline { position: fixed; bottom: 6px; right: 8px; font: 12px var(--sans); color: #ff8a80; background: rgba(0,0,0,.6); padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="grid-view" class="hidden">
+  <div class="panel">
+    <div class="head">
+      <div class="title" id="g-title">MINECRAFT BINGO</div>
+      <div class="stats" id="g-stats"></div>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="queue hidden" id="queue"></div>
+  </div>
+</div>
+
+<div id="list-view" class="hidden">
+  <div class="list">
+    <div class="title" id="l-title">NOCH ZU ERLEDIGEN</div>
+    <div class="stats" id="l-stats"></div>
+    <div id="items"></div>
+  </div>
+</div>
+
+<div id="toast"><div class="t1"></div><div class="t2"></div><div class="t3"></div></div>
+<div id="bingo"></div>
+<div id="offline" class="hidden">Bingo-Server nicht erreichbar …</div>
+
+<script src="shared.js"></script>
+<script>
+  // URL-Optionen:  ?mode=grid|list  &toast=0  &title=Text  &done=1 (Liste: erledigte zeigen)  &max=8 (Liste: max. Einträge)
+  const qs = new URLSearchParams(location.search);
+  const MODE = qs.get('mode') === 'list' ? 'list' : 'grid';
+  const SHOW_TOAST = qs.get('toast') !== '0';
+  const SHOW_DONE = qs.get('done') === '1';
+  const MAX = parseInt(qs.get('max') || '10', 10);
+  if (qs.get('title')) { document.getElementById('g-title').textContent = qs.get('title'); document.getElementById('l-title').textContent = qs.get('title'); }
+  document.getElementById(MODE + '-view').classList.remove('hidden');
+
+  let state = null;
+  const knownIds = new Set();
+  let firstRender = true;
+
+  function winningCells(card) {
+    const { size, cells } = card;
+    const ok = i => cells[i] && (cells[i].free || cells[i].done);
+    const lines = [];
+    for (let r = 0; r < size; r++) lines.push([...Array(size)].map((_, c) => r * size + c));
+    for (let c = 0; c < size; c++) lines.push([...Array(size)].map((_, r) => r * size + c));
+    lines.push([...Array(size)].map((_, i) => i * size + i));
+    lines.push([...Array(size)].map((_, i) => i * size + (size - 1 - i)));
+    const win = new Set();
+    lines.filter(l => l.every(ok)).forEach(l => l.forEach(i => win.add(i)));
+    return win;
+  }
+
+  function isNew(id) {
+    const fresh = !firstRender && !knownIds.has(id);
+    knownIds.add(id);
+    return fresh;
+  }
+
+  function renderGrid() {
+    const { card, queue, bingos } = state;
+    const grid = document.getElementById('grid');
+    grid.style.gridTemplateColumns = `repeat(${card.size}, 1fr)`;
+    grid.style.gridTemplateRows = `repeat(${card.size}, 1fr)`;
+    const fs = (11 / card.size).toFixed(2) + 'vmin';
+    const win = winningCells(card);
+    grid.innerHTML = card.cells.map((c, i) => {
+      if (!c) return '<div class="cell empty"></div>';
+      if (c.free) return `<div class="cell free${win.has(i) ? ' win' : ''}"><span>FREI</span></div>`;
+      const cls = ['cell', c.done && 'done', win.has(i) && 'win', isNew(c.id) && 'new'].filter(Boolean).join(' ');
+      return `<div class="${cls}" style="--tier:${tierInfo(c.tier).color};--fs:${fs}">
+        <div class="txt">${esc(c.text)}</div><div class="who">${esc(eventLine(c.event))}</div></div>`;
+    }).join('');
+    const tasks = card.cells.filter(c => c && !c.free);
+    const done = tasks.filter(t => t.done).length;
+    document.getElementById('g-stats').innerHTML =
+      `<b>${done}</b>/${tasks.length} erledigt` + (bingos ? ` · <b>${bingos}</b>× BINGO` : '');
+    const q = document.getElementById('queue');
+    q.classList.toggle('hidden', !queue.length);
+    q.innerHTML = `Karte voll – <b>${queue.length}</b> weitere Aufgabe${queue.length === 1 ? '' : 'n'} in der Warteschlange`;
+  }
+
+  function renderList() {
+    const all = [...state.card.cells.filter(c => c && !c.free), ...state.queue];
+    const open = all.filter(t => !t.done).sort((a, b) => a.addedAt - b.addedAt);
+    const shown = SHOW_DONE ? [...open, ...all.filter(t => t.done)] : open;
+    document.getElementById('l-stats').textContent =
+      `${open.length} offen · ${all.length - open.length} erledigt` + (state.bingos ? ` · ${state.bingos}× BINGO` : '');
+    const items = shown.slice(0, MAX).map(t => `
+      <div class="item${t.done ? ' done' : ''}${isNew(t.id) ? ' new' : ''}" style="--tier:${tierInfo(t.tier).color}">
+        <div class="box">${t.done ? '✔' : ''}</div>
+        <div><div class="txt">${esc(t.text)}</div><div class="who">${esc(eventLine(t.event))}</div></div>
+      </div>`).join('');
+    const rest = shown.length - MAX;
+    document.getElementById('items').innerHTML =
+      (items || '<div class="empty-msg">Alles erledigt – noch keine neuen Aufgaben 🎉</div>') +
+      (rest > 0 ? `<div class="more">+ ${rest} weitere</div>` : '');
+  }
+
+  // Schrift pro Feld verkleinern, bis lange Wörter (z. B. „Diamantspitzhacke“) ohne Umbruch mitten im Wort passen.
+  function fitCells() {
+    document.querySelectorAll('.cell .txt').forEach(el => {
+      el.style.fontSize = '';
+      const cell = el.parentElement;
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      for (let i = 0; i < 14 && (el.scrollWidth > el.clientWidth + 1 || cell.scrollHeight > cell.clientHeight + 1); i++) {
+        size *= 0.93;
+        el.style.fontSize = size + 'px';
+      }
+    });
+  }
+
+  function render() {
+    if (!state) return;
+    MODE === 'grid' ? renderGrid() : renderList();
+    if (MODE === 'grid') fitCells();
+    firstRender = false;
+  }
+  document.fonts.ready.then(() => MODE === 'grid' && fitCells());
+  addEventListener('resize', () => MODE === 'grid' && fitCells());
+
+  // Einblendungen nacheinander abspielen, damit bei vielen Events keine verloren gehen.
+  const toastQueue = [];
+  let toastBusy = false;
+  function showNextToast() {
+    if (toastBusy || !toastQueue.length) return;
+    toastBusy = true;
+    const { task, where, reroll } = toastQueue.shift();
+    const el = document.getElementById('toast');
+    const ev = task.event || {};
+    const info = EVENT_INFO[ev.type] || EVENT_INFO.manual;
+    const head = reroll ? '🎲 Neu gewürfelt' : ev.type === 'manual' ? '✋ Neue Aufgabe' : `${info.icon} ${info.label}${ev.user ? ' von ' + ev.user : ''}`;
+    el.querySelector('.t1').textContent = head + (where === 'queue' ? ' (Warteschlange)' : '');
+    el.querySelector('.t2').textContent = task.text;
+    const t3 = el.querySelector('.t3');
+    t3.textContent = tierInfo(task.tier).label;
+    t3.style.background = tierInfo(task.tier).color;
+    el.classList.add('show');
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => { toastBusy = false; showNextToast(); }, 600); }, 5000);
+  }
+
+  connectStream({
+    state(s) { state = s; render(); },
+    task(t) { if (SHOW_TOAST) { toastQueue.push(t); showNextToast(); } },
+    bingo() {
+      const el = document.getElementById('bingo');
+      el.innerHTML = '<span>BINGO!</span>';
+      setTimeout(() => { el.innerHTML = ''; }, 3300);
+    },
+    status(ok) { document.getElementById('offline').classList.toggle('hidden', ok); },
+  });
+</script>
+</body>
+</html>

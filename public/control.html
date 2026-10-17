@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Bingo Steuerung</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #12141c; --panel: #1b1e29; --cell: #262a38; --border: #343a4d;
+    --text: #eef1f7; --muted: #9aa4b8; --accent: #ffcf3f; --done: #3ecf5e; --danger: #ff5a4f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 'Segoe UI', system-ui, sans-serif; }
+  main { max-width: 1280px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: 1fr 360px; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  h1 { margin: 0; font-size: 22px; color: var(--accent); }
+  h2 { margin: 0 0 10px; font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .top { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .top .spacer { flex: 1; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); display: inline-block; }
+  .dot.on { background: var(--done); }
+  button { font: inherit; color: var(--text); background: var(--cell); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.danger:hover { border-color: var(--danger); color: var(--danger); }
+  input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; width: 100%; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .events { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .events button { padding: 12px 8px; font-weight: 700; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .events button small { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .manual { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+  .manual button { padding: 6px; font-size: 13px; border-left: 4px solid var(--tier); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .msg { min-height: 20px; font-size: 13px; margin-top: 8px; color: var(--accent); }
+
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 10px; flex-wrap: wrap; }
+  .card-head .stats { color: var(--muted); }
+  .card-head .stats b { color: var(--text); }
+  .grid { display: grid; gap: 6px; }
+  .cell { position: relative; min-height: 96px; background: var(--cell); border-radius: 8px; padding: 8px 8px 26px 12px; border: 2px solid transparent; cursor: pointer; overflow: hidden; user-select: none; }
+  .cell::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--tier, transparent); }
+  .cell:hover { border-color: var(--accent); }
+  .cell .txt { font-weight: 700; font-size: 13px; }
+  .cell .who { font-size: 11px; color: var(--muted); position: absolute; left: 12px; bottom: 6px; right: 54px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell .tools { position: absolute; right: 4px; bottom: 3px; display: flex; gap: 2px; }
+  .cell .tools button { padding: 0 5px; font-size: 13px; background: transparent; border: none; opacity: .55; }
+  .cell .tools button:hover { opacity: 1; }
+  .cell.done { background: #1d4528; border-color: #2f8a45; }
+  .cell.done .txt { text-decoration: line-through; opacity: .75; }
+  .cell.done::after { content: '✔'; position: absolute; right: 6px; top: 2px; color: var(--done); font-size: 20px; }
+  .cell.empty { background: transparent; border: 2px dashed var(--border); cursor: default; display: grid; place-items: center; color: var(--border); }
+  .cell.free { background: #4a3a08; display: grid; place-items: center; color: var(--accent); font-weight: 800; cursor: default; }
+  .cell.new { animation: flash 2s ease-out; }
+  @keyframes flash { 0% { border-color: var(--accent); box-shadow: 0 0 14px var(--accent); } 100% { border-color: transparent; box-shadow: none; } }
+
+  .qitem { display: flex; gap: 8px; align-items: center; background: var(--cell); padding: 6px 8px; border-radius: 6px; margin-top: 6px; border-left: 4px solid var(--tier); }
+  .qitem .txt { flex: 1; font-size: 13px; font-weight: 600; }
+  .qitem button { padding: 2px 6px; background: transparent; border: none; }
+  .log { max-height: 260px; overflow: auto; font-size: 12px; }
+  .log div { padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .log div b { color: var(--text); font-weight: 600; }
+  .links div { display: flex; gap: 6px; margin-bottom: 6px; }
+  .links input { font-size: 12px; }
+  .links button { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { padding: 3px 0; color: var(--muted); }
+  td:last-child { text-align: right; color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1>⛏️ Minecraft-Bingo – Steuerung</h1>
+    <span><span class="dot" id="dot"></span> <span id="conn">verbinde …</span></span>
+    <span class="spacer"></span>
+    <button id="newcard">🃏 Neue Karte</button>
+    <button id="reset" class="danger">🗑️ Alles zurücksetzen</button>
+  </div>
+
+  <div style="display:grid;gap:16px;align-content:start">
+    <section>
+      <div class="card-head">
+        <h2 style="margin:0" id="card-title">Karte</h2>
+        <span class="stats" id="stats"></span>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="hint">Klick auf ein Feld = erledigt / nicht erledigt · 🎲 = neu würfeln · ✕ = entfernen (nächste Aufgabe aus der Warteschlange rückt nach)</div>
+    </section>
+    <section id="queue-section">
+      <h2>Warteschlange <span id="qcount"></span></h2>
+      <div id="queue"></div>
+      <div class="hint">Wenn die Karte voll ist, landen neue Aufgaben hier. Mit „Neue Karte“ werden alle offenen Aufgaben auf die neue Karte übernommen.</div>
+    </section>
+  </div>
+
+  <div style="display:grid;gap:16px;align-content:start">
+    <section>
+      <h2>Event auslösen</h2>
+      <div class="row">
+        <div><label for="user">Name</label><input id="user" placeholder="z. B. Zuschauer123" autocomplete="off"></div>
+        <div style="flex:.6"><label for="amount">Menge</label><input id="amount" placeholder="Bits / € / Anzahl" inputmode="decimal" autocomplete="off"></div>
+      </div>
+      <div class="events">
+        <button data-type="follow">❤️ Follow<small id="d-follow"></small></button>
+        <button data-type="bits">💎 Bits<small id="d-bits"></small></button>
+        <button data-type="dono">💶 Dono<small id="d-dono"></small></button>
+        <button data-type="sub">⭐ Sub<small id="d-sub"></small></button>
+        <button data-type="subgift">🎁 Subgift<small id="d-subgift"></small></button>
+        <button data-type="raid">🚨 Raid<small id="d-raid"></small></button>
+      </div>
+      <label style="margin-top:12px">Aufgabe ohne Event hinzufügen</label>
+      <div class="manual">
+        <button data-tier="leicht" style="--tier:#5fd068">Leicht</button>
+        <button data-tier="mittel" style="--tier:#f5c542">Mittel</button>
+        <button data-tier="schwer" style="--tier:#ff5a4f">Schwer</button>
+        <button data-tier="raid" style="--tier:#b76cff">Raid</button>
+      </div>
+      <div class="msg" id="msg"></div>
+    </section>
+
+    <section class="links">
+      <h2>OBS-Browserquellen</h2>
+      <div><input readonly id="url-grid"><button data-copy="url-grid">Kopieren</button></div>
+      <div><input readonly id="url-list"><button data-copy="url-list">Kopieren</button></div>
+      <div class="hint">Karte: z. B. 900 × 900 px · Liste: z. B. 500 × 700 px. Hintergrund ist transparent.</div>
+    </section>
+
+    <section>
+      <h2>Regeln (config.json)</h2>
+      <table id="rules"></table>
+    </section>
+
+    <section>
+      <h2>Verlauf</h2>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+</main>
+
+<script src="shared.js"></script>
+<script>
+  let state = null;
+  const knownIds = new Set();
+  let firstRender = true;
+  const $ = id => document.getElementById(id);
+
+  $('url-grid').value = `${location.origin}/overlay.html`;
+  $('url-list').value = `${location.origin}/overlay.html?mode=list`;
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => {
+    const input = $(b.dataset.copy);
+    input.select();
+    navigator.clipboard?.writeText(input.value).catch(() => document.execCommand('copy'));
+    b.textContent = 'Kopiert ✓';
+    setTimeout(() => b.textContent = 'Kopieren', 1500);
+  });
+
+  function flash(text) {
+    $('msg').textContent = text;
+    clearTimeout(flash.t);
+    flash.t = setTimeout(() => $('msg').textContent = '', 6000);
+  }
+
+  function render() {
+    const { card, queue, log, bingos, config } = state;
+    const grid = $('grid');
+    grid.style.gridTemplateColumns = `repeat(${card.size}, 1fr)`;
+    grid.innerHTML = card.cells.map(c => {
+      if (!c) return '<div class="cell empty">–</div>';
+      if (c.free) return '<div class="cell free">FREI</div>';
+      const fresh = !firstRender && !knownIds.has(c.id);
+      knownIds.add(c.id);
+      return `<div class="cell${c.done ? ' done' : ''}${fresh ? ' new' : ''}" data-id="${c.id}" style="--tier:${tierInfo(c.tier).color}" title="${esc(tierInfo(c.tier).label)}">
+        <div class="txt">${esc(c.text)}</div>
+        <div class="who">${esc(eventLine(c.event))}</div>
+        <div class="tools"><button data-act="reroll" title="Neu würfeln">🎲</button><button data-act="remove" title="Entfernen">✕</button></div>
+      </div>`;
+    }).join('');
+
+    const tasks = card.cells.filter(c => c && !c.free);
+    $('card-title').textContent = `Karte #${card.number || 1}`;
+    $('stats').innerHTML = `<b>${tasks.filter(t => t.done).length}</b>/${tasks.length} erledigt · ${card.cells.filter(c => c === null).length} Felder frei` + (bingos ? ` · <b>${bingos}× BINGO</b>` : '');
+
+    $('qcount').textContent = queue.length ? `(${queue.length})` : '';
+    $('queue').innerHTML = queue.length ? queue.map(t => `
+      <div class="qitem" data-id="${t.id}" style="--tier:${tierInfo(t.tier).color}">
+        <span class="txt">${esc(t.text)}<br><small style="color:var(--muted);font-weight:400">${esc(eventLine(t.event))}</small></span>
+        <button data-act="reroll" title="Neu würfeln">🎲</button><button data-act="remove" title="Entfernen">✕</button>
+      </div>`).join('') : '<div class="hint" style="margin:0">leer</div>';
+
+    $('log').innerHTML = log.map(l => {
+      const time = new Date(l.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const who = l.type === 'system' ? '⚙️' : esc(eventLine(l));
+      return `<div>${time} ${who} ${l.tier ? `<span style="color:${tierInfo(l.tier).color}">[${tierInfo(l.tier).label}]</span>` : ''} <b>${esc(l.text)}</b></div>`;
+    }).join('') || '<div>Noch keine Events</div>';
+
+    const t = config.thresholds, e = config.events;
+    const lbl = tier => tier ? tierInfo(tier).label : 'aus';
+    $('d-follow').textContent = lbl(e.follow);
+    $('d-bits').textContent = `${lbl(e.bits)} · ab ${t.bigBits}: ${lbl(e.bigBits)}`;
+    $('d-dono').textContent = `${lbl(e.dono)} · ab ${t.bigDono} €: ${lbl(e.bigDono)}`;
+    $('d-sub').textContent = lbl(e.sub);
+    $('d-subgift').textContent = `${lbl(e.subgift)} · ab ${t.bigSubgift}: ${lbl(e.bigSubgift)}`;
+    $('d-raid').textContent = lbl(e.raid);
+    $('rules').innerHTML = [
+      ['❤️ Follow', lbl(e.follow)],
+      [`💎 Bits (ab ${t.minBits})`, lbl(e.bits)],
+      [`💎 Viele Bits (ab ${t.bigBits})`, lbl(e.bigBits)],
+      [`💶 Dono (ab ${t.minDono} €)`, lbl(e.dono)],
+      [`💶 Große Dono (ab ${t.bigDono} €)`, lbl(e.bigDono)],
+      ['⭐ Sub', lbl(e.sub)],
+      ['🎁 Subgift', lbl(e.subgift)],
+      [`🎁 Subgift (ab ${t.bigSubgift} Subs)`, lbl(e.bigSubgift)],
+      ['🚨 Raid', lbl(e.raid)],
+      ['Aufgaben im Pool', Object.entries(state.poolSizes).map(([k, v]) => `${lbl(k)} ${v}`).join(' · ')],
+    ].map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('');
+
+    firstRender = false;
+  }
+
+  document.addEventListener('click', async e => {
+    const btn = e.target.closest('button');
+    const holder = e.target.closest('[data-id]');
+    if (btn && btn.dataset.act && holder) {
+      e.stopPropagation();
+      if (btn.dataset.act === 'remove' && !confirm('Aufgabe wirklich entfernen?')) return;
+      return api(btn.dataset.act, { id: holder.dataset.id });
+    }
+    if (holder && holder.classList.contains('cell')) return api('toggle', { id: holder.dataset.id });
+    if (btn && btn.dataset.type) {
+      const r = await api('event', { type: btn.dataset.type, user: $('user').value, amount: $('amount').value });
+      flash(r.task ? `Neue Aufgabe: ${r.task.text}${r.where === 'queue' ? ' (Warteschlange)' : ''}` : (r.reason || r.error));
+      $('user').value = ''; $('amount').value = '';
+      return;
+    }
+    if (btn && btn.dataset.tier) {
+      const r = await api('add', { tier: btn.dataset.tier, user: $('user').value });
+      flash(r.task ? `Neue Aufgabe: ${r.task.text}` : r.error);
+    }
+  });
+
+  $('newcard').onclick = () => confirm('Neue Karte starten? Offene Aufgaben werden übernommen, erledigte verschwinden.') && api('newcard');
+  $('reset').onclick = () => confirm('Wirklich ALLES zurücksetzen? Alle Aufgaben, Warteschlange und Verlauf werden gelöscht.') && api('reset');
+
+  connectStream({
+    state(s) { state = s; render(); },
+    status(ok) { $('dot').classList.toggle('on', ok); $('conn').textContent = ok ? 'verbunden' : 'Server nicht erreichbar'; },
+  });
+</script>
+</body>
+</html>
